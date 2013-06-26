@@ -1,11 +1,11 @@
 Summary:	Security auditing on UNIX systems
 Name:		tiger
-Version:	3.2.2
+Version:	3.2.3
 Release:	0.1
 License:	GPL+
 Group:		Applications/System
 Source0:	http://savannah.nongnu.org/download/tiger/%{name}-%{version}.tar.gz
-# Source0-md5:	00e85a371989a533164beaea8ed5af01
+# Source0-md5:	f41076f645da9de937819bf6d516e546
 URL:		http://www.nongnu.org/tiger/
 Source2:	%{name}.cron
 Source3:	%{name}.ignore
@@ -27,22 +27,35 @@ understand and easy to enhance.
 %prep
 %setup -q
 
-find -name "*.rpmorig" -o -name "*.orig" -o -name "*.old" -delete
-
 recode ISO-8859-1..UTF-8 man/tiger.8.in
 
 install -d examples
 cp -p cronrc tigerrc tigerrc-all tigerrc-dist tigerrc-TAMU \
       site-sample site-saturn %{SOURCE4} examples
 
+# hack around debianism:
+# ../util/genmsgidx[79]: tempfile: not found
+cat > tempfile <<EOF
+#!/bin/sh
+exec mktemp
+EOF
+chmod a+rx tempfile
+
 %build
-autoreconf -i
+export PATH=$PATH:$(pwd)
+
+%{__aclocal}
+%{__autoconf}
 %configure \
 	--with-tigerhome=%{_libdir}/%{name} \
 	--with-tigerwork=%{_localstatedir}/run/tiger/work \
 	--with-tigerlog=%{_localstatedir}/log/tiger \
 	--with-tigerbin=%{_sbindir} \
 	--with-tigerconfig=%{_sysconfdir}/tiger
+
+# HACK: avoid updating it, as scripts broken
+touch doc/explain.idx
+%{__make} -j1 -C doc
 
 %{__make}
 

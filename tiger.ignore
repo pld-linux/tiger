@@ -1,0 +1,82 @@
+# Fedora uses a "mail" group to allow some access to /var/spool/mail.
+Login ID mail's home directory \(/var/spool/mail\) has group `mail' write access.
+# Fedora uses a "gdm" group to allow GDM to write ti /var/gdm
+Login ID gdm's home directory \(/var/gdm\) has group `gdm' write access.
+# nfsnobody is not a real user account, thus it does not have shell init file in its homedir
+Login ID nfsnobody may be missing a shell initialization file /var/lib/nfs/.nologinrc.
+# Standard perm in Fedora: 664
+Log file /var/log/wtmp permission should be 644
+/var/log/wtmp should not have group write.
+# Standard perm in Fedora: 600
+Log file /var/log/btmp permission should be 660
+# Standard perm in Fedora: 664
+Log file /var/run/utmp permission should be 644
+# Does not exist in Fedora
+Log file /var/log/loginlog does not exist
+# Standard perm in Fedora: 600
+Log file /var/log/messages permission should be 640
+# Does not exist by default in Fedora
+Root crontab does not exist
+# Standard service ports in Fedora
+The port for service fsp is also assigned to service ftp.
+The port for service whois is also assigned to service nicname.
+The port for service www is also assigned to service http.
+The port for service snmp-trap is also assigned to service snmptrap.
+The port for service z3950 is also assigned to service z39.50.
+The port for service ulistserv is also assigned to service ulistproc.
+The port for service route is also assigned to service router.
+The port for service font-service is also assigned to service xfs.
+The port for service kerberos4 is also assigned to service kerberos-iv.
+The port for service krb_prop is also assigned to service krb5_prop.
+The port for service ssmtp is also assigned to service smtps.
+The port for service rmtcfg is also assigned to service bvcontrol.
+The port for service zebrasrv is also assigned to service hpstgmgr.
+The port for service zebra is also assigned to service discp-client.
+The port for service ripd is also assigned to service discp-server.
+The port for service ripngd is also assigned to service servicemeter.
+The port for service ospfd is also assigned to service nsc-ccs.
+The port for service bgpd is also assigned to service nsc-posa.
+The port for service ospf6d is also assigned to service netmon.
+The port for service kpasswd is also assigned to service rxe.
+The port for service kx is also assigned to service dsatp.
+The port for service moira_db is also assigned to service entomb.
+The port for service moira_update is also assigned to service multiling-http.
+The port for service predict is also assigned to service eoss.
+The port for service xtelw is also assigned to service pdps.
+The port for service ndtp is also assigned to service search.
+The port for service afmbackup is also assigned to service zarkov.
+The port for service pcrd is also assigned to service esri_sde.
+The port for service mrtd is also assigned to service hyperscsi-port.
+The port for service bgpsim is also assigned to service v5ua.
+The port for service sane is also assigned to service sane-port.
+The port for service omniorb is also assigned to service radan-http.
+# Set in /etc/bashrc
+There are no umask entries in /etc/profile
+# Set in /etc/csh/cshrc
+There are no umask entries in /etc/csh.login
+# Standard perm in Fedora: 4666
+/dev/log has world permissions
+# Standard perm in Fedora: 644
+/dev/rtc has world permissions
+# Standard perm in Fedora: 666
+/dev/ptmx has world permissions
+# Normal in Fedora
+The directory /dev/snd resides in a device directory.
+# Standard perm in Fedora: 644
+/etc/xinetd.conf permissions are not 600.
+# Standard perm in Fedora: 644
+/etc/xinetd.d/.* permissions are not 600.
+# Normal in Fedora
+Group root\(0\) has got the following members: root
+# Normal in Fedora
+Group bin\(1\) has got the following members: root,bin,daemon
+# Normal in Fedora
+Group daemon\(2\) has got the following members: root,bin,daemon
+# Normal in Fedora
+Login halt has a group id of 0 which should be reserved for root
+# Normal in Fedora
+Login operator has a group id of 0 which should be reserved for root
+# Normal in Fedora
+Login shutdown has a group id of 0 which should be reserved for root
+# Normal in Fedora
+Login sync has a group id of 0 which should be reserved for root

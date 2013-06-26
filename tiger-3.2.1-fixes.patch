@@ -1,0 +1,508 @@
+# Various fixes
+--- ./config.fixes	2003-09-19 02:46:26.000000000 +0200
++++ ./config	2005-08-07 16:14:27.000000000 +0200
+@@ -17,6 +17,16 @@
+ #
+ #  config (top level) - 06/14/93
+ #
++# 06/22/2005 jfs  Abort signature generation if the user does not 
++#                 have permissions to change the directories signatures are
++#                 stored in.
++# 01/21/2005 jfs  Safer creation of $WORKDIR if undefined 
++# 08/13/2004 jfs  Setup all locales as 'C' (Debian bug  #270108)
++# 04/28/2004 jfs  Changed -f RCFILE check to -r to allow use through ssh
++#                 as suggested by Falk Siemonsmeier:
++#                  cat /etc/tiger/tigerrc | ssh tiger -c /dev/stdin
++# 01/13/2004 jfs  Added check when running with -f since on some (unconfigured)
++#		  systems this might fail.
+ # 08/19/2003 jfs  tara -> Tiger in the usage
+ # 08/13/2003 jfs  Added some of ARSC changes including:
+ #                 - support for signature generation (enhanced with also
+@@ -47,8 +57,8 @@
+ # This is important to avoid problems with commands that are
+ # dependant on the defined language environment
+ LANG="C"
+-LC_TIME="C"
+-export LANG LC_TIME
++LC_ALL="C"
++export LANG LC_ALL
+ error_siggen()
+ {
+   dir=$1
+@@ -70,7 +80,7 @@
+   if [ ! -d "$BASEDIR/systems/$OS/$REV/$ARCH/" ] 
+   then
+         printf "Creating the directory $BASEDIR/systems/$OS/$REV/$ARCH/ where signatures will be stored..."
+-    	mkdir -p "$BASEDIR/systems/$OS/$REV/$ARCH/"
++    	mkdir -p "$BASEDIR/systems/$OS/$REV/$ARCH/" || { echo "Cannot create directory '$BASEDIR/systems/$OS/$REV/$ARCH/'!" >&2; exit 1; }
+ 	echo "...created"
+   fi
+ # NOTE: I'm not sure it's ok to create the directory since
+@@ -92,7 +102,7 @@
+   then
+     printf "Generating and installing file access lists..."
+     $BASEDIR/util/mkfilelst
+-    mv "file_access_list.$OS-$REV-$ARCH" $BASEDIR/systems/$OS/$REV/$ARCH/file_access_list
++    mv "file_access_list.$OS-$REV-$ARCH" $BASEDIR/systems/$OS/$REV/$ARCH/file_access_list || { echo "Cannot move files to '$BASEDIR/systems/$OS/$REV/$ARCH/'!" >&2; exit 1; }
+     echo "...done"
+   else
+     error_siggen "$PWD" "file_access_list.$OS-$REV-$ARCH" "$WORKDIR"
+@@ -104,13 +114,22 @@
+ do_usage()
+ {
+ echo "Tiger, version $TIGERVERSION"
+-echo "Usage: ./tiger [-B dir] [-d dir|@host] [-w dir] [-b dir] [-e|-E] [-GH] [-q]"
++echo "Usage: ./tiger [-vthqGSH]  [-B dir] [-l dir|@host] [-w dir] [-b dir] [-e|-E] [-c config] [-A arch] [-O os] [-R release]"
++echo ""
++echo "       -v     Show the Tiger version."
++echo ""
++echo "       -t     Run in test mode."
++echo ""
++echo "       -h     Show usage (this help)."
++echo ""
++echo "       -q     Supress messages to be as quiet as possible, only "
++echo "              security messages will be shown."
+ echo ""
+ echo "       -B name"
+ echo "              Specify  the directory where tiger is installed.  If"
+ echo "              not specified, '$BASEDIR' is used."
+ echo ""
+-echo "       -d name"
++echo "       -l name"
+ echo "              Specify the name of the directory where Tiger  will"
+ echo "              write  the  security  report.  This defaults to    "
+ echo "              '$LOGDIR'. The filename  of  the report will be of "
+@@ -159,8 +178,16 @@
+ echo "              same  time.   The checks will not be as in depth as"
+ echo "              they would be if run on the client itself."
+ echo ""
+-echo "       -q     Supress messages to be as quiet as possible, only "
+-echo "              security messages will be shown."
++echo "Overrides for values detected  by the configuration system:"
++echo "       -A arch"
++echo "              Specify  an  alternate  architecture for tiger"
++echo ""
++echo "       -O os"
++echo "              Specify  an  alternate  operating system for tiger"
++echo ""
++echo "       -R release"
++echo "              Specify  an  alternate  operating system release  "
++echo "              for tiger"
+ echo ""
+ echo "Report bugs at http://savannah.nongnu.org/projects/tiger"
+ }
+@@ -203,7 +230,7 @@
+   fi
+ 
+   LOGDIR=${TigerLogDir:=.}
+-  WORKDIR=${TigerWorkDir:=${TMPDIR:=/tmp}}
++  WORKDIR="$TigerWorkDir"
+   RCFILE=${TigerConfigDir:=.}/tigerrc
+   IGNORE_FILE=${TigerConfigDir:=.}/tiger.ignore
+   TIGERHOMEDIR="$BASEDIR"
+@@ -241,7 +268,6 @@
+     shift;
+   done
+ 
+-
+   TIGERVERSION="`/bin/cat $TIGERHOMEDIR/version.h 2>/dev/null`"
+   [ ! -n "$TIGERVERSION" ] && TIGERVERSION="undetermined"
+   export TIGERVERSION
+@@ -251,6 +277,19 @@
+     exit 0
+   }
+ 
++  if [ -z "$WORKDIR" ] ; then
++	  WORKDIR=${TMPDIR:=/tmp}
++	  ( umask 077; mkdir $WORKDIR/tiger.$$ ) || { echo "$0: Cannot create temporary directory" >&2; exit 1; }
++	  WORKDIR="$WORKDIR/tiger.$$"
++  fi
++  # TODO: WORKDIR should be removed on exit if it is located in a temporary 
++  # directory
++  if [ ! -d "$WORKDIR" ] ; then
++  	  echo "Configured working directory $WORKDIR does not exist" >&2
++	  exit 1
++  fi
++
++
+   [ "$QUIET" != "Y" ] && echo "Configuring..."
+ 
+   set X `$BASEDIR/util/gethostinfo` unknown unknown unknown
+@@ -336,8 +375,8 @@
+     done
+   }
+ 
+-  [ -n "$RCFILE" -a ! -f "$RCFILE" ] && {
+-    echo "Control file "$RCFILE" not found... exiting..."
++  [ -n "$RCFILE" -a ! -r "$RCFILE" ] && {
++    echo "Control file "$RCFILE" not defined or not readable... exiting..."
+     exit 1
+   }
+ 
+@@ -345,7 +384,7 @@
+   # Preprocess the RC file, to export variables to environment
+   #
+ 
+-  [ -n "$RCFILE" -a -f $RCFILE ] && {
++  [ -n "$RCFILE" -a -r $RCFILE ] && {
+     $GREP -v '^#' $RCFILE |
+     $SED -e 's/^\(.*\)=/export \1; \1=/' > $WORKDIR/rcfile.$$
+     . $WORKDIR/rcfile.$$
+@@ -357,7 +396,9 @@
+   then
+   # Linux hostname has the -f option for FQDN... (jfs)
+   # (others?)
+-          HOSTNAME=`$GETHOSTNAME -f`
++	  HOSTNAME=`$GETHOSTNAME -f 2>/dev/null`
++# But sometimes this will fail.... (if the system is not properly setup)
++	  [ $? -ne 0 ] && HOSTNAME=`$GETHOSTNAME`
+   fi
+ 
+   for file in './site-$HOSTNAME' '$BASEDIR/site-$HOSTNAME' './site' '$BASEDIR/site'
+@@ -388,4 +429,8 @@
+     . $WORKDIR/tigercmds.$$
+     $RM -f $WORKDIR/tigercmds.$$
+   }
++
++  # set the PATH 
++  PATH=/sbin:/usr/sbin:/bin:/usr/bin
++  export PATH
+ }
+--- ./tigercron.in.fixes	2003-08-19 18:34:27.000000000 +0200
++++ ./tigercron.in	2005-08-07 16:14:27.000000000 +0200
+@@ -248,6 +248,7 @@
+ done >> $WORKDIR/tigcron.diff.$$
+ 
+ [ ! -n "$Tiger_Mail_RCPT" ] && Tiger_Mail_RCPT="root"
++[ ! -n "$Tiger_Mail_FROM" ] && Tiger_Mail_FROM="root@$HOSTNAME" 
+   
+ length=1
+ if [ ! -n "$EGREP" ] ; then
+@@ -257,13 +258,13 @@
+ [ -s "$WORKDIR/tigcron.diff.$$" -a $length -gt 0 ] && {
+   send="Y"
+   [ "$Tiger_Cron_SendOKReports" = "N" ] &&
+-  [  -z "`grep ERR $WORKDIR/tigcron.diff.$$`" ] &&
++  [ -z "`grep ERR $WORKDIR/tigcron.diff.$$`" ] &&
+   [ -z "`grep WARN $WORKDIR/tigcron.diff.$$`" ] && { 
+   	send="N"
+   }
+   haveallcmds MAILER && [ "$send" = "Y" ] &&  {
+ 	# Mail header (so it does not just say it's root
+-	echo "From: Tiger automatic auditor at $HOSTNAME <root@$HOSTNAME>" 
++	echo "From: \"Tiger automatic auditor at $HOSTNAME\" <$Tiger_Mail_FROM>" 
+ 	echo "Subject: Tiger Auditing Report for $HOSTNAME"
+ 	echo 
+ 	cat  $WORKDIR/tigcron.diff.$$ 
+--- ./tigercron.fixes	2003-08-19 19:37:42.000000000 +0200
++++ ./tigercron	2005-08-07 16:14:27.000000000 +0200
+@@ -256,6 +256,7 @@
+ done >> $WORKDIR/tigcron.diff.$$
+ 
+ [ ! -n "$Tiger_Mail_RCPT" ] && Tiger_Mail_RCPT="root"
++[ ! -n "$Tiger_Mail_FROM" ] && Tiger_Mail_FROM="root@$HOSTNAME"
+   
+ length=1
+ if [ ! -n "$EGREP" ] ; then
+@@ -271,7 +272,8 @@
+   }
+   haveallcmds MAILER && [ "$send" = "Y" ] &&  {
+ 	# Mail header (so it does not just say it's root
+-	echo "From: Tiger automatic auditor at $HOSTNAME <root@$HOSTNAME>" 
++	echo "From: \"Tiger automatic auditor at $HOSTNAME\" <$Tiger_Mail_FROM>"
++	echo "To: $Tiger_Mail_RCPT"
+ 	echo "Subject: Tiger Auditing Report for $HOSTNAME"
+ 	echo 
+ 	cat  $WORKDIR/tigcron.diff.$$ 
+--- ./initdefs.fixes	2003-10-10 19:05:48.000000000 +0200
++++ ./initdefs	2005-08-07 16:14:27.000000000 +0200
+@@ -16,6 +16,13 @@
+ #
+ # initdefs - 06/14/93
+ #
++# initdefs - 01/10/2005 - cslater - Modified ignore function so that
++#                     filtering can also be done on msgid and level
++# initdefs - 08/01/2004 - jfs - Allow removal from LOGDIR so that tiger -e
++#                     works as expected
++# initdefs - 10/15/2003 - jfs - Quoted $__File in deleted() in order
++#                     for the check_rootkit check to work properly.
++#                     (Debian bug #215882)
+ # initdefs - 10/10/2003 - jfs - Improved check so that it will not 
+ #                     remove files created by a different user and
+ #                     warn if files to be deleted do not exist 
+@@ -117,14 +124,14 @@
+   do
+     if [ -n "$LS" ]
+     then 
+-    	if [ -z "`$LS $__file 2>/dev/null`" ] 
++    	if [ -z "`$LS \"$__file\" 2>/dev/null`" ] 
+ 	then
+ #       		echo "--ERROR-- [post001e] File \`$__file' will not be removed since it does not exist"
+ 		goahead=0
+ 	fi
+     	if [ $goahead -eq 1 -a  -n "$AWK" -a -n "$UUID" ]
+ 	then
+-	    	if [ "$UUID" != "`$LS -nl $__file | $AWK '{print $3}'`" ] 
++	    	if [ "$UUID" != "`$LS -nl \"$__file\" | $AWK '{print $3}'`" ] 
+ 		then
+        			echo "--ERROR-- [post001e] File \`$__file' will not be removed since it has not been created by the current user (symlink attack?)."
+ 			goahead=0
+@@ -134,6 +141,7 @@
+     [ $goahead -eq 1 ]  &&  {
+     eval "case \"\$__file\" in
+       $WORKDIR*) $RM -f \"\$__file\";;
++      $LOGDIR*)  $RM -f \"\$__file\";;
+       *) echo \"--ERROR-- [post001e] File \\\`\$__file' not removed.\";;
+     esac"
+     }
+@@ -164,7 +172,7 @@
+   __len=${Tiger_Output_Width:=79}
+ 
+   # If the message should be ignore it is removed
+-  ignore_message "$_mesg" && return 
++  ignore_message "$_level $_msgid $_mesg" && return 
+ 
+   [ "$HTML" = "N" ] && {
+ 
+@@ -505,15 +513,15 @@
+ 	            if [ $__script_owner -eq $UUID ]; then
+ 			$__script_run
+ 		    else
+-			echo "--ERROR-- [misc024w] The $__script_run script will not be run since it is owned by a user ($__script_owner) different than the one running Tiger ($UUID)"
++			echo "--ERROR-- [misc024e] The $__script_run script will not be run since it is owned by a user ($__script_owner) different than the one running Tiger ($UUID)"
+   			__error=1
+ 		    fi
+ 	    else
+-          	echo "--ERROR-- [misc025w] The $__script_run will not be run since it is not executable"
++          	echo "--ERROR-- [misc025e] The $__script_run will not be run since it is not executable"
+                 __error=1
+             fi
+         else
+-          echo "--ERROR-- [misc005w] Can't find '$script'..."
++          echo "--ERROR-- [misc005e] Can't find '$script'..."
+           __error=1
+         fi
+   done
+--- ./c/getpermit.c.fixes	2002-06-14 10:51:31.000000000 +0200
++++ ./c/getpermit.c	2005-08-07 16:14:27.000000000 +0200
+@@ -3,6 +3,7 @@
+ #include <sys/stat.h>
+ #include <pwd.h>
+ #include <grp.h>
++#include <string.h>
+ /*
+    tiger - A UN*X security checking system
+    Copyright (C) 1993 Douglas Lee Schales, David K. Hess, David R. Safford
+--- ./tiger.fixes	2003-10-07 00:20:24.000000000 +0200
++++ ./tiger	2005-08-07 16:14:27.000000000 +0200
+@@ -21,6 +21,11 @@
+ # all the checks configured for your system in the tigerrc configuration 
+ # file.
+ #
++# 05/14/2005 jfs Patch from Nicolas François which fixes aide output handling
++# 01/25/2005 cslater Added separate config variable for 
++#		 check_passwdformat.
++# 01/15/2003 jfs Check should use INETDCONF (and not INETDFILE).
++#                (Temporary fix: defined it if undefined)
+ # 09/03/2003 jfs Included check_ssh to the checks
+ # 08/19/2003 jfs check_cron is now check_crontabs
+ # 08/15/2003 jfs Integrated ARSC log to syslog mechanism but modified
+@@ -43,7 +48,7 @@
+ echo "Tiger UN*X security checking system"
+ echo "   Developed by Texas A&M University, 1994"
+ echo "   Updated by the Advanced Research Corporation, 1999-2002"
+-echo "   Further updated by Javier Fernandez-Sanguino, 2001-2003"
++echo "   Further updated by Javier Fernandez-Sanguino, 2001-2005"
+ echo "   Covered by the GNU General Public License (GPL)"
+ echo
+ TigerInstallDir="."
+@@ -195,7 +200,7 @@
+     run_script find_files >> $logtmp
+   else
+     echo "`$TIMECMD`> Starting file systems scans in background..."
+-    $SCRIPTDIR/find_files > $WORKDIR/fsscan.log$$ &
++    $SCRIPTDIR/find_files > $WORKDIR/fsscan.log$$ 2>/dev/null &
+     fspid=$!
+   fi
+ }
+@@ -243,6 +248,9 @@
+ [ "$Tiger_Check_PASSWD" != 'N' ] && {
+   echo "`$TIMECMD`> Checking password files..."
+   run_script check_passwd >> $logtmp
++}
++
++[ "$Tiger_Check_PASSWD_FORMAT" != 'N' ] && {
+   echo "`$TIMECMD`> Checking password format..."
+   run_script check_passwdformat >> $logtmp
+ }
+@@ -301,10 +309,21 @@
+ }
+ 
+ [ "$Tiger_Check_INETD" != 'N' ] && {
+-  echo "`$TIMECMD`> Checking 'inetd' configuration..."
+-  run_script check_inetd >> $logtmp
+-  echo "`$TIMECMD`> Checking 'tcpd' configuration..."
+-  run_script check_tcpd >> $logtmp
++  # Temporary definition until all the config files (and gen_inetd
++  # scripts) are updated.
++  [ -z "$INETDCONF" ] && INETDCONF="/etc/inetd.conf"
++  [ -z "$XINETDCONF" ] && XINETDCONF="/etc/xinetd.conf"
++
++  [ -n "$INETDCONF" ] && [ -f "$INETDCONF" ] && {
++    echo "`$TIMECMD`> Checking 'inetd' configuration..."
++    run_script check_inetd >> $logtmp
++    echo "`$TIMECMD`> Checking 'tcpd' configuration..."
++    run_script check_tcpd >> $logtmp
++  }
++  [ -n "$XINETDCONF" ] && [ -f "$XINETDCONF" ] && {
++    echo "`$TIMECMD`> Checking 'xinetd' configuration..."
++    run_script check_xinetd >> $logtmp
++  }
+ }
+ 
+ [ "$Tiger_Check_SERVICES" != 'N' ] && {
+@@ -427,6 +446,16 @@
+   run_script check_ftpusers >> $logtmp
+ }
+ 
++[ "$Tiger_Check_OMNIBACK" != 'N' ] && {
++  echo "`$TIMECMD`> Checking omniback configuration..."
++  run_script check_omniback >> $logtmp
++}
++
++[ "$Tiger_Check_NTP" != 'N' ] && {
++  echo "`$TIMECMD`> Checking NTP configuration..."
++  run_script check_ntp >> $logtmp
++}
++
+ #
+ # When not doing checks of all setuid executables, we can do
+ # embedded checks while the file system scans are running.
+@@ -480,8 +509,8 @@
+ [ -n "$aidepid" ] && {
+     echo "`$TIMECMD`> Waiting for Aide to finish..."
+     wait $aidepid
+-    $CAT $tripout >> $logtmp
+-    delete $tripout
++    $CAT $aideout >> $logtmp
++    delete $aideout
+ } 2>/dev/null
+ 
+ #echo "`$TIMECMD`> Security report completed for ${HOSTNAME}."
+--- ./util/getfs-nfs.fixes	2003-04-21 10:02:04.000000000 +0200
++++ ./util/getfs-nfs	2005-08-07 16:14:27.000000000 +0200
+@@ -58,7 +58,3 @@
+ done
+ #
+ exit 0
+-#
+-exit 0
+-#
+-exit 0
+--- ./util/getfs-amd.fixes	2003-04-21 10:02:04.000000000 +0200
++++ ./util/getfs-amd	2005-08-07 16:14:48.000000000 +0200
+@@ -63,7 +63,7 @@
+ $SORT > $WORKDIR/gfsa2.$$
+ 
+ if [ -s $WORKDIR/gfsa2.$$ ]; then
+-  $JOIN -a1 -j 1 -o 1.2 1.3 2.2 $WORKDIR/gfsa1.$$ $WORKDIR/gfsa2.$$ |
++  $JOIN -a1 -j 1 -o "1.2 1.3 2.2" $WORKDIR/gfsa1.$$ $WORKDIR/gfsa2.$$ |
+   while read user dir location
+   do
+     echo $user $dir ${location:=$HOSTNAME}
+@@ -79,7 +79,3 @@
+ $RM -f $WORKDIR/gfsa1.$$ $WORKDIR/gfsa2.$$
+ #
+ exit 0
+-#
+-exit 0
+-#
+-exit 0
+--- ./util/getfs-std.fixes	2003-04-21 10:02:04.000000000 +0200
++++ ./util/getfs-std	2005-08-07 16:14:27.000000000 +0200
+@@ -20,6 +20,8 @@
+ #-----------------------------------------------------------------------------
+ #
+ 
++[ -z "$SED" ] && SED=`which sed`
++
+ haveallof()
+ {
+   retval=0
+@@ -44,7 +46,3 @@
+ 
+ #
+ exit 0
+-#
+-exit 0
+-#
+-exit 0
+--- ./util/getfs-automount.fixes	2003-04-21 10:02:04.000000000 +0200
++++ ./util/getfs-automount	2005-08-07 16:15:17.000000000 +0200
+@@ -62,7 +62,7 @@
+ $SORT > $WORKDIR/gfsa2.$$
+ 
+ if [ -s $WORKDIR/gfsa2.$$ ]; then
+-  $JOIN -a1 -j 1 -o 1.2 1.3 2.2 $WORKDIR/gfsa1.$$ $WORKDIR/gfsa2.$$ |
++  $JOIN -a1 -j 1 -o "1.2 1.3 2.2" $WORKDIR/gfsa1.$$ $WORKDIR/gfsa2.$$ |
+   while read user dir location
+   do
+     if [ ! -n "$location" ]; then
+@@ -86,7 +86,3 @@
+ $RM -f $WORKDIR/gfsa1.$$ $WORKDIR/gfsa2.$$
+ #
+ exit 0
+-#
+-exit 0
+-#
+-exit 0
+--- ./config.in.fixes	2003-08-19 18:34:00.000000000 +0200
++++ ./config.in	2005-08-07 16:14:27.000000000 +0200
+@@ -24,6 +24,7 @@
+ # 04/15/2003 jfs  Modified to support -B to work in the local dir 
+ # 04/21/2003 jfs  Modified to only use hostname -f for Linux _and_
+ #		  moved hostname check after RCFILE parsing!
++# 08/13/2004 jfs  Setup all locales as 'C' (Debian bug  #270108)
+ #
+ #-----------------------------------------------------------------------------
+ #
+@@ -38,8 +39,8 @@
+ # This is important to avoid problems with commands that are
+ # dependant on the defined language environment
+ LANG="C"
+-LC_TIME="C"
+-export LANG LC_TIME
++LC_ALL="C"
++export LANG LC_ALL
+ 
+ checkfile()
+ {
+@@ -79,7 +80,7 @@
+   fi
+ 
+   LOGDIR=${TigerLogDir:=.}
+-  WORKDIR=${TigerWorkDir:=${TMPDIR:=/tmp/}}
++  WORKDIR="$TigerWorkDir"
+   RCFILE=${TigerConfigDir:=.}/tigerrc
+   IGNORE_FILE=${TigerConfigDir:=.}/tiger.ignore
+   TIGERHOMEDIR="$BASEDIR"
+@@ -124,6 +125,19 @@
+     exit 0
+   }
+ 
++  if [ -z "$WORKDIR" ] ; then
++          WORKDIR=${TMPDIR:=/tmp}
++          ( umask 077; mkdir $WORKDIR/tiger.$$ ) || { echo "$0: Cannot create temporary directory" >&2; exit 1; }
++          WORKDIR="$WORKDIR/tiger.$$"
++  fi
++  # TODO: WORKDIR should be removed on exit if it is located in a temporary
++  # directory
++  if [ ! -d "$WORKDIR" ] ; then
++          echo "Configured working directory $WORKDIR does not exist" >&2
++          exit 1
++  fi
++
++
+   echo "Configuring..."
+ 
+   set X `$BASEDIR/util/gethostinfo` unknown unknown unknown

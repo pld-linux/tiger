@@ -1,21 +1,15 @@
 Summary:	Security auditing on UNIX systems
 Name:		tiger
-Version:	3.2.1
+Version:	3.2.2
 Release:	0.1
 License:	GPL+
 Group:		Applications/System
 Source0:	http://savannah.nongnu.org/download/tiger/%{name}-%{version}.tar.gz
-# Source0-md5:	7c4d6dc7c56b3b6f8fa349eca7f8e41d
+# Source0-md5:	00e85a371989a533164beaea8ed5af01
 URL:		http://www.nongnu.org/tiger/
 Source2:	%{name}.cron
 Source3:	%{name}.ignore
 Source4:	%{name}.ignore.server
-Patch0:		%{name}-3.2.1-autotools.patch
-Patch1:		%{name}-3.2.1-config.patch
-Patch2:		%{name}-3.2.1-doc.patch
-Patch3:		%{name}-3.2.1-scripts.patch
-Patch4:		%{name}-3.2.1-fixes.patch
-Patch5:		%{name}-3.2.1-gcc4.patch
 BuildRequires:	autoconf
 BuildRequires:	recode
 Requires:	bash
@@ -31,20 +25,11 @@ UNIX systems. It is designed to hopefully be easy to use, easy to
 understand and easy to enhance.
 
 %prep
-%setup -q -n %{name}
-%patch0 -p1
-%patch1 -p1
-%patch2 -p1
-%patch3 -p1
-%patch4 -p1
-%patch5 -p1
+%setup -q
 
 find -name "*.rpmorig" -o -name "*.orig" -o -name "*.old" -delete
 
 recode ISO-8859-1..UTF-8 man/tiger.8.in
-
-# Remove CVS dirs, sort by reverse, because there's dirs like CVS/CVS/Foo
-find -type d -name CVS -print0 | sort -zr | xargs -0 rm -r
 
 install -d examples
 cp -p cronrc tigerrc tigerrc-all tigerrc-dist tigerrc-TAMU \
@@ -124,3 +109,6 @@ rm -rf $RPM_BUILD_ROOT
 
 %dir %{_libdir}/%{name}/util
 %attr(755,root,root) %{_libdir}/%{name}/util/*
+
+%dir %{_libdir}/%{name}/check.d
+%{_libdir}/%{name}/check.d/README
